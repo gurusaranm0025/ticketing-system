@@ -4,6 +4,9 @@ from db import Ticket
 from typing import List
 
 def ticket_to_json(tickets: List[Ticket]):
+    """
+        Convert queried data to json
+    """
     data = []
     for ticket in tickets:
         ticket_data = {

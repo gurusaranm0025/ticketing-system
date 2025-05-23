@@ -28,6 +28,9 @@ class Ticket(Base):
     
 
 def get_session():
+    """
+        Generates session for the server.
+    """
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     return Session()

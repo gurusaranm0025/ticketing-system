@@ -11,6 +11,9 @@ session = get_session()
     
 @app.route('/new_ticket', methods=['POST'])
 def new_ticket():
+    """
+        Create a new ticket
+    """
     if request.method == 'POST':
         try:
             request_data = request.get_json()
@@ -28,8 +31,14 @@ def new_ticket():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+
 @app.route('/get_tickets/<offset_val>/<filter_name>/<value>', methods=['GET'])
 def get_tickets(offset_val, filter_name, value):
+    """
+        Get and read tickets.
+        Filter through based on their status and who created the ticket.
+        Decide how many rows you want to query.
+    """
     if request.method == 'GET':
         try:
             if offset_val == None:
