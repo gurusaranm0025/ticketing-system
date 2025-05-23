@@ -33,6 +33,7 @@ def new_ticket():
 
 
 @app.route('/get_tickets/<offset_val>/<filter_name>/<value>', methods=['GET'])
+@app.route('/get_tickets', defaults={'offset_val': 0, 'filter_name': None, 'value': None}, methods=['GET'])
 def get_tickets(offset_val, filter_name, value):
     """
         Get and read tickets.
@@ -58,10 +59,24 @@ def get_tickets(offset_val, filter_name, value):
         except Exception as e:
             return jsonify({'error': str(e)}), 500
         
-# @app.route('/update')
-# def update():
-#     stmt = Ticket.
-    
+@app.route('/update/<column_name>/<id>/<new_value>', methods=['POST'])
+def handle_update(column_name, id, new_value):
+    if request.method == 'POST':
+        try:
+            if column_name != None and id != None and new_value != None:
+                ticket = session.query(Ticket).filter(Ticket.id==id).first()
+
+                if column_name == 'status':
+                    ticket.status = Status(new_value)
+                if column_name == 'description':
+                    ticket.description = new_value
+                    
+                session.commit()
+                return jsonify({'message': f"Column {column_name}, with id: {id}, is changed."}), 200
+            else:
+                return jsonify({'error': 'send a valid column name, id and the new value to update.'}), 400
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
         
 if __name__ == "__main__":
     app.run()
