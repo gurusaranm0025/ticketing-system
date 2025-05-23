@@ -84,23 +84,26 @@ def handle_update(column_name, id, new_value):
 @app.route('/delete/<int:id>/del', defaults={'hard_delete': True}, methods=['DELETE'])
 @app.route('/delete/<int:id>', defaults={'hard_delete': False}, methods=['DELETE'])
 def handle_delete(id, hard_delete):
-        if request.method == 'DELETE':
-            try:
-                if id>0 :
-                    ticket = session.query(Ticket).get(id)
-                    
-                    if hard_delete:
-                        session.delete(ticket)
-                    else:
-                        ticket.is_deleted = True
-                    
-                    session.commit()
-                    
-                    return jsonify({'message': f'deleted ticket with id: {id}'}), 200
+    """
+        Delete any ticket.
+    """
+    if request.method == 'DELETE':
+        try:
+            if id>0 :
+                ticket = session.query(Ticket).get(id)
+                
+                if hard_delete:
+                    session.delete(ticket)
                 else:
-                    return jsonify({'error': 'id is invalid'}), 400
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
+                    ticket.is_deleted = True
+                
+                session.commit()
+                
+                return jsonify({'message': f'deleted ticket with id: {id}'}), 200
+            else:
+                return jsonify({'error': 'id is invalid'}), 400
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
                 
 if __name__ == "__main__":
     app.run()
