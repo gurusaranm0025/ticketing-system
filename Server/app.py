@@ -48,11 +48,11 @@ def get_tickets(offset_val, filter_name, value):
                 filter_name, value = None, None
                 
             if filter_name == 'status' and len(value)>0:
-                tickets = session.query(Ticket).filter(Ticket.status== Status(value)).offset(offset_val).limit(TICKETS_LIMIT).all()
+                tickets = session.query(Ticket).filter(Ticket.status==Status(value) and not Ticket.is_deleted).offset(offset_val).limit(TICKETS_LIMIT).all()
             elif filter_name == 'user' and len(value)>0:
-                tickets = session.query(Ticket).filter(Ticket.created_by==value).offset(offset_val).limit(TICKETS_LIMIT).all()
+                tickets = session.query(Ticket).filter(Ticket.created_by==value and not Ticket.is_deleted).offset(offset_val).limit(TICKETS_LIMIT).all()
             else:                
-                tickets = session.query(Ticket).offset(offset_val).limit(TICKETS_LIMIT).all()
+                tickets = session.query(Ticket).filter(not Ticket.is_deleted).offset(offset_val).limit(TICKETS_LIMIT).all()
             
             data = ticket_to_json(tickets)
             return data, 200
@@ -80,6 +80,27 @@ def handle_update(column_name, id, new_value):
                 return jsonify({'error': 'send a valid column name, id and the new value to update.'}), 400
         except Exception as e:
             return jsonify({'error': str(e)}), 500
-        
+
+@app.route('/delete/<int:id>/del', defaults={'hard_delete': True}, methods=['DELETE'])
+@app.route('/delete/<int:id>', defaults={'hard_delete': False}, methods=['DELETE'])
+def handle_delete(id, hard_delete):
+        if request.method == 'DELETE':
+            try:
+                if id>0 :
+                    ticket = session.query(Ticket).get(id)
+                    
+                    if hard_delete:
+                        session.delete(ticket)
+                    else:
+                        ticket.is_deleted = True
+                    
+                    session.commit()
+                    
+                    return jsonify({'message': f'deleted ticket with id: {id}'}), 200
+                else:
+                    return jsonify({'error': 'id is invalid'}), 400
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+                
 if __name__ == "__main__":
     app.run()

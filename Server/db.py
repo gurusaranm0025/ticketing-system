@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Enum
+from sqlalchemy import create_engine, Column, Integer, String, Enum, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
@@ -23,6 +23,7 @@ class Ticket(Base):
     status = Column(Enum(Status), nullable=False)
     created_by = Column(String(50), nullable=False)
     
+    is_deleted = Column(Boolean, default=False)
     created_at = Column(String(20), default=datetime.datetime.now().strftime(f"%Y-%m-%d %H:%M:%S"))
     updated_at = Column(String(20), default=datetime.datetime.now().strftime(f"%Y-%m-%d %H:%M:%S"))
     
