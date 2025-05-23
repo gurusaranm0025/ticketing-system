@@ -61,6 +61,9 @@ def get_tickets(offset_val, filter_name, value):
         
 @app.route('/update/<column_name>/<id>/<new_value>', methods=['POST'])
 def handle_update(column_name, id, new_value):
+    """
+        Update the status or description of tickets
+    """
     if request.method == 'POST':
         try:
             if column_name != None and id != None and new_value != None:
