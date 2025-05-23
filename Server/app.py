@@ -1,105 +1,58 @@
 from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Enum, create_engine
-from sqlalchemy.sql import func
-from sqlalchemy.orm import sessionmaker
+
+# local imports
+from db import get_session, Ticket, Status
+from methods import ticket_to_json
+
+TICKETS_LIMIT = 5
  
-
-import enum
-
 app = Flask(__name__)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
-
-engine = create_engine('sqlite:///instance/site.db')
-Session = sessionmaker(bind=engine)
-session = Session()
-
-conn = engine.connect()
-
-####### MODELS
-class Status(enum.Enum):
-    OPEN = 'open'
-    IN_PROGRESS = 'in_progress'
-    CLOSED = 'CLOSED'    
-
-class Ticket(db.Model):
-    __tablename__ = 'tickets'
-    
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    title = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.String(100), nullable=False)
-    status = db.Column(Enum(Status), nullable=False)
-    updated_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
-    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
-    created_by = db.Column(db.String(50), nullable=False)
-
-# METHODS
-def convert_to_json(tickets):
-    data = []    
-    for ticket in tickets:
-        if ticket.status == Status.OPEN:
-            status = 'open'
-        elif ticket.status == Status.IN_PROGRESS:
-            status = 'in_progress'
-        elif ticket.status == Status.CLOSED:
-            status = 'closed'
-        data.append({"id": ticket.id, "title": ticket.title, "description": ticket.description, "status": status, "created_at": ticket.created_at, "updated_at": ticket.updated_at, "created_by": ticket.created_by})
-    return jsonify(data)
-
-    
-######## ROUTES
-@app.route('/get_tickets')
-def handle():
-    tickets = session.query(Ticket).all()
-    return convert_to_json(tickets)
-
-@app.route('/filter_tickets/<filter_column>/<value>', methods=['GET'])
-def handle_filter(filter_column, value):
-    if request.method == 'GET':
-        if filter_column == 'status':
-            if value == 'open':
-                value = Status.OPEN
-            elif value == 'in_progress':
-                value == Status.IN_PROGRESS
-            elif value == 'closed':
-                value == Status.CLOSED
-            tickets = session.query(Ticket).filter_by(status=value)
-            return convert_to_json(tickets)
-        
-        if filter_column == 'user':
-            tickets = session.query(Ticket).filter_by(created_by=value)
-            return convert_to_json(tickets)
-            
+session = get_session()
     
 @app.route('/new_ticket', methods=['POST'])
-def handle_post():
+def new_ticket():
     if request.method == 'POST':
-        data = request.get_json()
-        
-        status = data['status']
-        if status == 'open':
-            status = Status.OPEN
-        elif status == 'in_progress':
-            status == Status.IN_PROGRESS
-        elif status == 'closed':
-            status == Status.CLOSED
+        try:
+            request_data = request.get_json()
+
+            ticket = Ticket(
+                title=request_data['title'], 
+                description=request_data['description'], 
+                status=Status(request_data['status']), 
+                created_by=request_data['created_by']
+            )
+            
+            session.add(ticket)
+            session.commit()
+            return jsonify({"message": 'new ticket added'}), 201
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+@app.route('/get_tickets/<offset_val>/<filter_name>/<value>', methods=['GET'])
+def get_tickets(offset_val, filter_name, value):
+    if request.method == 'GET':
+        try:
+            if offset_val == None:
+                offset_val = 0
+            if filter_name == None or value == None:
+                filter_name, value = None, None
                 
-        ticket = Ticket(title=data['title'], description=data['description'], status=status, created_by=data['created_by'])
+            if filter_name == 'status' and len(value)>0:
+                tickets = session.query(Ticket).filter(Ticket.status== Status(value)).offset(offset_val).limit(TICKETS_LIMIT).all()
+            elif filter_name == 'user' and len(value)>0:
+                tickets = session.query(Ticket).filter(Ticket.created_by==value).offset(offset_val).limit(TICKETS_LIMIT).all()
+            else:                
+                tickets = session.query(Ticket).offset(offset_val).limit(TICKETS_LIMIT).all()
+            
+            data = ticket_to_json(tickets)
+            return data, 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
         
-        db.session.add(ticket)
-        db.session.commit()
-        return jsonify({'message': 'added successfully'})
-    
 # @app.route('/update')
 # def update():
 #     stmt = Ticket.
     
         
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
     app.run()
