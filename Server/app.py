@@ -8,7 +8,7 @@ TICKETS_LIMIT = 5
  
 app = Flask(__name__)
 session = get_session()
-    
+
 @app.route('/new_ticket', methods=['POST'])
 def new_ticket():
     """
@@ -33,8 +33,8 @@ def new_ticket():
 
 
 @app.route('/get_tickets', defaults={'offset_val': 0, 'filter_name': None, 'value': None}, methods=['GET'])
-@app.route('/get_tickets/<filter_name>/<value>', defaults={'offset_val': 0}, methods=['GET'])
-@app.route('/get_tickets/<filter_name>/<value>/<offset_val>', methods=['GET'])
+@app.route('/get_tickets/<string:filter_name>/<string:value>', defaults={'offset_val': 0}, methods=['GET'])
+@app.route('/get_tickets/<string:filter_name>/<string:value>/<int:offset_val>', methods=['GET'])
 def get_tickets(offset_val, filter_name, value):
     """
         Get and read tickets.
@@ -60,7 +60,7 @@ def get_tickets(offset_val, filter_name, value):
         except Exception as e:
             return jsonify({'error': str(e)}), 500
         
-@app.route('/update/<column_name>/<id>/<new_value>', methods=['POST'])
+@app.route('/update/<string:column_name>/<int:id>/<string:new_value>', methods=['POST'])
 def handle_update(column_name, id, new_value):
     """
         Update the status or description of tickets
