@@ -32,8 +32,9 @@ def new_ticket():
             return jsonify({"error": str(e)}), 500
 
 
-@app.route('/get_tickets/<offset_val>/<filter_name>/<value>', methods=['GET'])
 @app.route('/get_tickets', defaults={'offset_val': 0, 'filter_name': None, 'value': None}, methods=['GET'])
+@app.route('/get_tickets/<filter_name>/<value>', defaults={'offset_val': 0}, methods=['GET'])
+@app.route('/get_tickets/<filter_name>/<value>/<offset_val>', methods=['GET'])
 def get_tickets(offset_val, filter_name, value):
     """
         Get and read tickets.
