@@ -1,8 +1,5 @@
 from flask import Flask, request, jsonify
-
-# local imports
 from db import get_session, Tickets, Status, Engineers, Tags
-from methods import ticket_to_json
 
 TICKETS_LIMIT = 5
  
@@ -28,15 +25,12 @@ def new_ticket():
         try:
             data = request.get_json()
             
+            engineers, tags = [], []
             if len(data["engineer_ids"])>0:
                 engineers = session.query(Engineers).filter(Engineers.id.in_(data["engineer_ids"])).all()
-            else:
-                engineers = []
 
             if len(data["tag_ids"])>0:            
                 tags = session.query(Tags).filter(Tags.id.in_(data["tag_ids"])).all()
-            else:
-                tags = []
 
             ticket = Tickets(
                 title=data['title'], 
@@ -49,113 +43,238 @@ def new_ticket():
             
             session.add(ticket)
             session.commit()
-            return jsonify({"message": 'new ticket added'}), 201
+            return jsonify({"message": 'new ticket added'}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
 
-@app.route('/get_tickets', defaults={'offset_val': 0, 'filter_name': None, 'value': None}, methods=['GET'])
-@app.route('/get_tickets/<string:filter_name>/<string:value>', defaults={'offset_val': 0}, methods=['GET'])
-@app.route('/get_tickets/<string:filter_name>/<string:value>/<int:offset_val>', methods=['GET'])
-def get_tickets(offset_val, filter_name, value):
+@app.route("/get_tickets", methods=["GET"])
+def get_tickets():
     """
         Get and read tickets.
         Filter through based on their status and who created the ticket.
         Decide how many rows you want to query.
+        Input JSON format:
+            {
+                offset_val: int -> default: 0,
+                filter_name: string -> default: None -> status, user,
+                value: string -> default: None
+            }
     """
-    if request.method == 'GET':
+    if request.method == "GET":
         try:
-            if offset_val == None:
-                offset_val = 0
-            if filter_name == None or value == None: # rethink this approach for checking the if both values are present
-                filter_name, value = None, None
+            data = request.get_json()
+            if data["offset_val"] == None:
+                data["offset_val"] = 0
+            if data["filter_name"] == None or data["value"] == None: # rethink this approach for checking the if both values are present
+                data["filter_name"], data["value"] = None, None
                 
-            if filter_name == 'status' and len(value)>0:
-                tickets = session.query(Tickets).filter(Tickets.status==Status(value) and Tickets.is_deleted==False).offset(offset_val).limit(TICKETS_LIMIT).all()
-            elif filter_name == 'user' and len(value)>0:
-                tickets = session.query(Tickets).filter(Tickets.created_by==value and Tickets.is_deleted==False).offset(offset_val).limit(TICKETS_LIMIT).all()
+            if data["filter_name"] == 'status' and len(data["value"])>0:
+                tickets = session.query(Tickets).filter(Tickets.status==Status(data["value"]) and Tickets.is_deleted==False).offset(data["offset_val"]).limit(TICKETS_LIMIT).all()
+            elif data["filter_name"] == 'user' and len(data["value"])>0:
+                tickets = session.query(Tickets).filter(Tickets.created_by==data["value"] and Tickets.is_deleted==False).offset(data["offset_val"]).limit(TICKETS_LIMIT).all()
             else:                
-                tickets = session.query(Tickets).filter(Tickets.is_deleted==False).offset(offset_val).limit(TICKETS_LIMIT).all()
+                tickets = session.query(Tickets).filter(Tickets.is_deleted==False).offset(data["offset_val"]).limit(TICKETS_LIMIT).all()
             
-            print(tickets[0])
-            data = ticket_to_json(tickets)
-            # print(data)
-            return data, 200
+            return jsonify([ticket.to_dict() for ticket in tickets]), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
         
-@app.route('/update/<string:column_name>/<int:id>/<string:new_value>', methods=['POST'])
-def handle_update(column_name, id, new_value):
+@app.route("/update", methods=['PATCH'])
+def handle_update():
     """
-        Update the status or description of tickets
+        Update the status or description of tickets.
+        Input JSON Format:
+            {
+                column_name: string,
+                ticket_id: int,
+                new_value: string
+            }
     """
-    if request.method == 'POST':
+    if request.method == "PATCH":
         try:
-            if column_name != None and id != None and new_value != None:
-                ticket = session.query(Tickets).filter(Tickets.id==id and Tickets.is_deleted==False).first()
+            data = request.get_json()
+            if data["column_name"] != None and data["ticket_id"] != None and data["new_value"] != None:
+                ticket = session.query(Tickets).filter(Tickets.id==data["ticket_id"] and Tickets.is_deleted==False).first()
 
-                if column_name == 'status':
-                    ticket.status = Status(new_value)
-                if column_name == 'description':
-                    ticket.description = new_value
+                if data["column_name"] == "status":
+                    ticket.status = Status(data["new_value"])
+                if data["column_name"] == "description":
+                    ticket.description = data["new_value"]
                     
                 session.commit()
-                return jsonify({'message': f"Column {column_name}, with id: {id}, is changed."}), 200
+                return jsonify({'message': f"Column {data["column_name"]}, with id: {data["ticket_id"]}, is changed."}), 200
             else:
                 return jsonify({'error': 'send a valid column name, id and the new value to update.'}), 400
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-@app.route('/delete/<int:id>/del', defaults={'hard_delete': True}, methods=['DELETE'])
-@app.route('/delete/<int:id>', defaults={'hard_delete': False}, methods=['DELETE'])
-def handle_delete(id, hard_delete):
+@app.route("/delete", methods=['DELETE'])
+def handle_delete():
     """
         Delete any ticket.
+        Input JSON:
+            {
+                ticket_id: int,
+                hard_delete: bool -> default: False
+            }
         (Fixed this ==> This endpoint allows hard delete of soft deleted items)
     """
-    if request.method == 'DELETE':
+    if request.method == "DELETE":
         try:
-            # if id>0 :
-                ticket = session.query(Tickets).filter(Tickets.is_deleted==False).get(id)
-                
-                if hard_delete:
-                    session.delete(ticket)
-                else:
-                    ticket.is_deleted = True
-                
-                session.commit()
-                
-                return jsonify({'message': f'deleted ticket with id: {id}'}), 200
-            # else:
-            #     return jsonify({'error': 'id is invalid'}), 400
+            data = request.get_json()
+            ticket = session.query(Tickets).filter(Tickets.id==data["ticket_id"] and Tickets.is_deleted==False).first()
+            
+            if data["hard_delete"]:
+                session.delete(ticket)
+            else:
+                ticket.is_deleted = True
+            
+            session.commit()
+            
+            return jsonify({"message": f'deleted ticket with id: {data["ticket_id"]}'}), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-@app.route("/add_engineer", methods=['POST'])
+@app.route("/add_engineer", methods=["POST"])
 def add_engineer():
-    if request.method == 'POST':
+    if request.method == "POST":
         try:
             data = request.get_json()
-            engineer = Engineers(name=data['name'], role=data["role"])
+            engineer = Engineers(name=data["name"], role=data["role"])
             
             session.add(engineer)
             session.commit()
-            return jsonify({'message': 'added engineer successfully.'}), 200
+            return jsonify({"message": "added engineer successfully."}), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-@app.route("/add_tag", methods=['POST'])
+@app.route("/assign_engineer", methods=["PATCH"])
+def assign_engineer():
+    """
+        Assign new engineer to a ticket.
+        Input JSON format:
+            {
+                ticket_id: int,
+                engineer_id: int,
+            }
+    """
+    if request.method == "PATCH":
+        try:
+            data = request.get_json()
+            
+            ticket = session.query(Tickets).filter(Tickets.id==data["ticket_id"] and Tickets.is_deleted==False).first()
+            
+            engineer = session.query(Engineers).filter(Engineers.id==data["engineer_id"]).first()
+            
+            if engineer not in ticket.engineers:
+                ticket.engineers.append(engineer)
+                session.commit()
+                return jsonify({"message": f'added engineer {engineer.name} to ticket id: {ticket.id}.'}), 200
+            else:
+                return jsonify({"error": f'Ticket already assigned to this engineer.'}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+@app.route("/unassign_engineer", methods=["PATCH"])
+def unassign_engineer():
+    """
+        Unassign an engineer from a ticket
+        Input JSON format:
+            {
+                ticket_id: int,
+                engineer_id: int
+            }
+    """
+    if request.method == "PATCH":
+        try:
+            data = request.get_json()
+            
+            ticket = session.query(Tickets).filter(Tickets.id==data["ticket_id"] and Tickets.is_deleted==False).first()
+            
+            engineer = session.query(Engineers).filter(Engineers.id==data["engineer_id"]).first()
+            
+            if engineer in ticket.engineers:
+                ticket.engineers.remove(engineer)
+                
+                return jsonify({"message": f'engineer {engineer.name} assigned to ticket with id: {ticket.id}'}), 200
+            else:
+                return jsonify({"error": f'engineer {engineer.name} is not assigned to this ticket.'}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+@app.route("/add_tag", methods=["POST"])
 def add_tag():
-    if request.method == 'POST':
+    if request.method == "POST":
         try:
             data = request.get_json()
             tag = Tags(name=data["name"], description=data["description"])
             
             session.add(tag)
             session.commit()
-            return jsonify({'message': 'added tag successfully.'}), 200
+            return jsonify({"message": "added tag successfully."}), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+
+@app.route("/assign_tag_to/<string:value>", methods=["PATCH"])
+def assign_tag(value):
+    """
+        Assign a tag
+        Input JSON format:
+            {
+                tag_id: int,
+                id: int
+            }
+    """
+    if request.method == "PATCH":
+        try:
+            data = request.get_json()
+            
+            if value == 'ticket':
+                queried_data = session.query(Tickets).filter(Tickets.id==data["id"] and Tickets.is_deleted==False).first()
+            elif value == 'engineer':
+                queried_data = session.query(Engineers).filter(Engineers.id==data["id"]).first()
+            
+            tag = session.query(Tags).filter(Tags.id==data["tag_id"]).first()
+            
+            if tag not in queried_data.tags:
+                queried_data.tags.append(tag)
+                session.commit()
+                return jsonify({"message": f'tag {tag.name} is assigned.'}), 200
+            else:
+                return jsonify({"error": "tag already assigned"}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+@app.route("/unassign_tag_from/<string:value>", methods=["PATCH"])
+def unassign_tag(value):
+    """
+        Unassigns tag from ticket and engineers.
+        Input JSON format:
+            {
+                tag_id: int,
+                id: int
+            }
+    """
+    if request.method == "PATCH":
+        try:
+            data = request.get_json()
+            
+            if value == 'ticket':
+                queried_data = session.query(Tickets).filter(Tickets.id==data["id"] and Tickets.is_deleted==False).first()
+            elif value == 'engineer':
+                queried_data = session.query(Engineers).filter(Engineers.id==data["id"]).first()
+            
+            tag = session.query(Tags).filter(Tags.id==data["tag_id"]).first()
+            
+            if tag in queried_data.tags:
+                queried_data.tags.remove(tag)
+                session.commit()
+                return jsonify({"message": f'removed tag: {tag.name}.'}), 200
+            else:
+                return jsonify({"error": f'tag: {tag.name} is not assigned here'}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
                 
 if __name__ == "__main__":
     app.run(debug=True)
