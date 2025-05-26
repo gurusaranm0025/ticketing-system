@@ -1,9 +1,9 @@
 from flask import jsonify
-from db import Ticket
+from db import Tickets
 
 from typing import List
 
-def ticket_to_json(tickets: List[Ticket]):
+def ticket_to_json(tickets: List[Tickets]):
     """
         Convert queried data to json
     """
@@ -17,6 +17,8 @@ def ticket_to_json(tickets: List[Ticket]):
             "created_by": ticket.created_by,
             "created_at": ticket.created_at,
             "updated_at": ticket.updated_at,
+            "engineers": [[engineer.name, engineer.id] for engineer in ticket.engineers],
+            "tags": [[tag.name, tag.id] for tag in ticket.tags]
         }
         data.append(ticket_data)
     return jsonify(data)
