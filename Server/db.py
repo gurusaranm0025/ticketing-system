@@ -1,13 +1,11 @@
 from sqlalchemy import create_engine, Column, Integer, String, Enum, Boolean, Table, ForeignKey
-# from sqlalchemy.sql import func
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
 
-import json
 import enum
 import datetime
 
-engine = create_engine('sqlite:///./instance/site.db')
+engine = create_engine('sqlite:///instance/site.db')
 Base = declarative_base()
 
 class Status(str, enum.Enum):
@@ -52,6 +50,30 @@ class Tickets(Base):
     tags = relationship("Tags", secondary=tickets_tags, back_populates="tickets")
     engineers = relationship("Engineers", secondary=tickets_engineers, back_populates="tickets")
     
+    def to_dict_minimal(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "status": self.status.value,
+            "created_by": self.created_by,
+            "created_at": self.created_at,
+            "updated_at":self.updated_at,            
+        }
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "status": self.status.value,
+            "created_by": self.created_by,
+            "created_at": self.created_at,
+            "updated_at":self.updated_at,
+            "engineers": [engineer.to_dict_minimal() for engineer in self.engineers],
+            "tags": [tag.to_dict_minimal() for tag in self.tags]
+        }
+    
 class Engineers(Base):
     __tablename__ = 'engineers'
     
@@ -62,14 +84,21 @@ class Engineers(Base):
     tickets = relationship("Tickets", secondary=tickets_engineers, back_populates="engineers")
     tags = relationship("Tags", secondary=engineers_tags, back_populates="engineers")
     
-    # def __repr__(self):
-    #     return json.dumps({
-    #         "id": self.id,
-    #         "name": self.name,
-    #         "role": self.role,
-    #         "tickets": self.tickets,
-    #         "tags": self.tags
-    #     })
+    def to_dict_minimal(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "role": self.role,
+        }
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "role": self.role,
+            "tickets": [ticket.to_dict_minimal() for ticket in self.tickets],
+            "tags": [tag.to_dict_minimal() for tag in self.tags]
+        }
     
 class Tags(Base):
     __tablename__ = 'tags'
@@ -81,7 +110,21 @@ class Tags(Base):
     tickets = relationship("Tickets", secondary=tickets_tags, back_populates="tags")
     engineers = relationship("Engineers", secondary=engineers_tags, back_populates="tags")
     
+    def to_dict_minimal(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description
+        }
     
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "tickets": [ticket.to_dict_minimal() for ticket in self.tickets],
+            "engineers": [engineer.to_dict_minimal() for engineer in self.engineers]
+        }
 
 def get_session():
     """
