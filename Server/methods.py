@@ -17,8 +17,8 @@ def ticket_to_json(tickets: List[Tickets]):
             "created_by": ticket.created_by,
             "created_at": ticket.created_at,
             "updated_at": ticket.updated_at,
-            "engineers": [[engineer.name, engineer.id] for engineer in ticket.engineers],
-            "tags": [[tag.name, tag.id] for tag in ticket.tags]
+            "engineers": [[engineer.id, engineer.name] for engineer in ticket.engineers],
+            "tags": [[tag.id, tag.name] for tag in ticket.tags]
         }
         data.append(ticket_data)
     return jsonify(data)
